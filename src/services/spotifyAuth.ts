@@ -92,43 +92,61 @@ export const handleAuthCallback = async (code: string) => {
     throw new Error('No verifier found in cache - can\'t validate query string callback parameters.');
   }
 
-  // Authenticate using the SDK with the code and code_verifier
-  const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
+  try {
+    // Log the payload for debugging
+    console.log('Sending token request with payload:', {
       client_id: CLIENT_ID,
       grant_type: 'authorization_code',
       code,
       redirect_uri: REDIRECT_URI,
       code_verifier: codeVerifier,
-    }),
-  });
+    });
 
-  if (!tokenResponse.ok) {
-    throw new Error('Failed to fetch token');
+    // Authenticate using the SDK with the code and code_verifier
+    const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: CLIENT_ID,
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: REDIRECT_URI,
+        code_verifier: codeVerifier,
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorResponse = await tokenResponse.json();
+      console.error('Token request failed:', errorResponse);
+      throw new Error(`Failed to fetch token: ${errorResponse.error_description || 'Unknown error'}`);
+    }
+
+    const tokenData = await tokenResponse.json();
+    console.log('Token response:', tokenData);
+
+    const sdkWithToken = SpotifyApi.withAccessToken(
+      tokenData.access_token,
+      tokenData.expires_in
+    );
+
+    // Save the access token in localStorage
+    localStorage.setItem('spotify_auth', JSON.stringify({
+      accessToken: tokenData.access_token,
+      expiresIn: tokenData.expires_in,
+      refreshToken: tokenData.refresh_token,
+    }));
+
+    const profile = await sdkWithToken.currentUser.profile();
+    return {
+      accessToken: tokenData.access_token,
+      user: profile
+    };
+  } catch (error) {
+    console.error('Error during handleAuthCallback:', error);
+    throw error;
   }
-
-  const tokenData = await tokenResponse.json();
-  const sdkWithToken = SpotifyApi.withAccessToken(
-    tokenData.access_token,
-    tokenData.expires_in
-  );
-
-  // Save the access token in localStorage
-  localStorage.setItem('spotify_auth', JSON.stringify({
-    accessToken: tokenData.access_token,
-    expiresIn: tokenData.expires_in,
-    refreshToken: tokenData.refresh_token,
-  }));
-
-  const profile = await sdkWithToken.currentUser.profile();
-  return {
-    accessToken: tokenData.access_token,
-    user: profile
-  };
 };
 
 export const fetchUserInfo = async () => {
