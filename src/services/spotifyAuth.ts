@@ -116,9 +116,17 @@ export const handleAuthCallback = async (code: string) => {
     tokenData.access_token,
     tokenData.expires_in
   );
+
+  // Save the access token in localStorage
+  localStorage.setItem('spotify_auth', JSON.stringify({
+    accessToken: tokenData.access_token,
+    expiresIn: tokenData.expires_in,
+    refreshToken: tokenData.refresh_token,
+  }));
+
   const profile = await sdkWithToken.currentUser.profile();
   return {
-    accessToken: sdk.getAccessToken(),
+    accessToken: tokenData.access_token,
     user: profile
   };
 };

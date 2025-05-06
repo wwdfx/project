@@ -16,20 +16,19 @@ const Callback: React.FC = () => {
         dispatch({ type: 'LOGIN_START' });
 
         try {
-          // Handle the authentication callback
           const { user, accessToken } = await handleAuthCallback(code);
           if (typeof accessToken === 'string') {
             dispatch({ type: 'LOGIN_SUCCESS', payload: { user, accessToken } });
           } else {
             throw new Error('Invalid access token');
           }
-          navigate('/');
+          navigate('/'); // Redirect to home page
         } catch (error) {
           dispatch({ type: 'LOGIN_FAILURE', payload: 'Authentication failed. Please try again.' });
-          navigate('/');
+          navigate('/'); // Redirect to home page
         }
       } else {
-        navigate('/');
+        navigate('/'); // Redirect to home page
       }
     };
 
