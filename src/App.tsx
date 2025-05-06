@@ -1,8 +1,10 @@
 import React from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { PlayerProvider } from './context/PlayerContext';
 import Login from './pages/Login';
 import Player from './pages/Player';
+import Callback from './pages/Callback'; // Ensure the Callback.tsx file exists in the ./pages directory
 
 // Add animation keyframes for vinyl spinning
 import './styles.css';
@@ -25,7 +27,12 @@ function App() {
   return (
     <AuthProvider>
       <PlayerProvider>
-        <AppContent />
+        <Router>
+          <Routes>
+            <Route path="/callback" element={<Callback />} />
+            <Route path="*" element={<AppContent />} />
+          </Routes>
+        </Router>
       </PlayerProvider>
     </AuthProvider>
   );
