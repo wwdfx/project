@@ -33,6 +33,7 @@ const sdk = SpotifyApi.withUserAuthorization(
 
 export const getSpotifyAuthUrl = async () => {
   const codeVerifier = generateCodeVerifier();
+  console.log('Generated code_verifier:', codeVerifier); // Log the generated code_verifier
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
   // Store the code_verifier in sessionStorage
@@ -88,6 +89,7 @@ export const saveAuthState = (state: any) => {
 
 export const handleAuthCallback = async (code: string) => {
   const codeVerifier = sessionStorage.getItem('spotify_code_verifier');
+  console.log('Retrieved code_verifier:', codeVerifier); // Log the retrieved code_verifier
   if (!codeVerifier) {
     throw new Error('No verifier found in cache - can\'t validate query string callback parameters.');
   }
