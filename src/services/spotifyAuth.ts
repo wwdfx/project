@@ -3,25 +3,31 @@ import { SpotifyApi } from '@spotify/web-api-ts-sdk';
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 const REDIRECT_URI = import.meta.env.VITE_REDIRECT_URI;
 
-// Generate a random string for the code_verifier
-const generateCodeVerifier = () => {
-  const array = new Uint8Array(128);
-  window.crypto.getRandomValues(array);
-  return btoa(String.fromCharCode(...array))
+// Helper function for URL-safe Base64 encoding
+const base64UrlEncode = (arrayBuffer: ArrayBuffer): string => {
+  return btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 };
 
+// Generate a random string for the code_verifier
+const generateCodeVerifier = (): string => {
+  const array = new Uint8Array(128);
+  window.crypto.getRandomValues(array);
+  const codeVerifier = base64UrlEncode(array);
+  if (codeVerifier.length < 43 || codeVerifier.length > 128) {
+    throw new Error('code_verifier must be between 43 and 128 characters.');
+  }
+  return codeVerifier;
+};
+
 // Generate a code challenge from the code_verifier
-const generateCodeChallenge = async (codeVerifier: string) => {
+const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
   const encoder = new TextEncoder();
   const data = encoder.encode(codeVerifier);
   const digest = await window.crypto.subtle.digest('SHA-256', data);
-  return btoa(String.fromCharCode(...new Uint8Array(digest)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  return base64UrlEncode(digest);
 };
 
 // Initialize the Spotify SDK with PKCE
@@ -31,7 +37,7 @@ const sdk = SpotifyApi.withUserAuthorization(
   ['user-read-private', 'user-read-email', 'user-library-read', 'user-read-playback-state', 'user-modify-playback-state', 'streaming']
 );
 
-export const getSpotifyAuthUrl = async () => {
+export const getSpotifyAuthUrl = async (): Promise<string> => {
   const codeVerifier = generateCodeVerifier();
   console.log('Generated code_verifier:', codeVerifier); // Log the generated code_verifier
   const codeChallenge = await generateCodeChallenge(codeVerifier);
@@ -87,7 +93,7 @@ export const saveAuthState = (state: any) => {
   }
 };
 
-export const handleAuthCallback = async (code: string) => {
+export const handleAuthCallback = async (code: string): Promise<{ accessToken: string; user: any }> => {
   const codeVerifier = sessionStorage.getItem('spotify_code_verifier');
   console.log('Retrieved code_verifier:', codeVerifier); // Log the retrieved code_verifier
   if (!codeVerifier) {
@@ -151,7 +157,7 @@ export const handleAuthCallback = async (code: string) => {
   }
 };
 
-export const fetchUserInfo = async () => {
+export const fetchUserInfo = async (): Promise<any> => {
   try {
     const profile = await sdk.currentUser.profile();
     return profile;
@@ -161,9 +167,9 @@ export const fetchUserInfo = async () => {
   }
 };
 
-export const getSpotifySDK = () => sdk;
+export const getSpotifySDK = (): SpotifyApi => sdk;
 
-export const logout = () => {
+export const logout = (): void => {
   localStorage.removeItem('spotify_auth');
   sessionStorage.removeItem('spotify_code_verifier');
   window.location.href = '/';
