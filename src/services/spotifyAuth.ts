@@ -13,11 +13,12 @@ const base64UrlEncode = (arrayBuffer: ArrayBuffer): string => {
 
 // Generate a random string for the code_verifier
 const generateCodeVerifier = (): string => {
-  const array = new Uint8Array(128);
+  const array = new Uint8Array(96); // Generate 96 random bytes
   window.crypto.getRandomValues(array);
   const codeVerifier = base64UrlEncode(array);
+  // Ensure the code_verifier meets the length requirements
   if (codeVerifier.length < 43 || codeVerifier.length > 128) {
-    throw new Error('code_verifier must be between 43 and 128 characters.');
+    throw new Error(`Generated code_verifier length (${codeVerifier.length}) is out of range. Adjust the input size.`);
   }
   return codeVerifier;
 };
