@@ -3,13 +3,41 @@ import { SpotifyApi } from '@spotify/web-api-ts-sdk';
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 const REDIRECT_URI = import.meta.env.VITE_REDIRECT_URI;
 
+// Generate a random string for the code_verifier
+const generateCodeVerifier = () => {
+  const array = new Uint8Array(128);
+  window.crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+};
+
+// Generate a code challenge from the code_verifier
+const generateCodeChallenge = async (codeVerifier: string) => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(codeVerifier);
+  const digest = await window.crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+};
+
+// Initialize the Spotify SDK with PKCE
 const sdk = SpotifyApi.withUserAuthorization(
   CLIENT_ID,
   REDIRECT_URI,
   ['user-read-private', 'user-read-email', 'user-library-read', 'user-read-playback-state', 'user-modify-playback-state', 'streaming']
 );
 
-export const getSpotifyAuthUrl = () => {
+export const getSpotifyAuthUrl = async () => {
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+  // Store the code_verifier in sessionStorage
+  sessionStorage.setItem('spotify_code_verifier', codeVerifier);
+
   const scopes = [
     'user-read-private',
     'user-read-email',
@@ -23,7 +51,9 @@ export const getSpotifyAuthUrl = () => {
     client_id: CLIENT_ID,
     response_type: 'code',
     redirect_uri: REDIRECT_URI,
-    scope: scopes.join(' ')
+    scope: scopes.join(' '),
+    code_challenge_method: 'S256',
+    code_challenge: codeChallenge
   });
 
   return `https://accounts.spotify.com/authorize?${params.toString()}`;
@@ -57,17 +87,40 @@ export const saveAuthState = (state: any) => {
 };
 
 export const handleAuthCallback = async (code: string) => {
-  try {
-    await sdk.authenticate();
-    const profile = await sdk.currentUser.profile();
-    return {
-      accessToken: sdk.getAccessToken(),
-      user: profile
-    };
-  } catch (error) {
-    console.error('Authentication failed:', error);
-    throw error;
+  const codeVerifier = sessionStorage.getItem('spotify_code_verifier');
+  if (!codeVerifier) {
+    throw new Error('No verifier found in cache - can\'t validate query string callback parameters.');
   }
+
+  // Authenticate using the SDK with the code and code_verifier
+  const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      client_id: CLIENT_ID,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: REDIRECT_URI,
+      code_verifier: codeVerifier,
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    throw new Error('Failed to fetch token');
+  }
+
+  const tokenData = await tokenResponse.json();
+  const sdkWithToken = SpotifyApi.withAccessToken(
+    tokenData.access_token,
+    tokenData.expires_in
+  );
+  const profile = await sdkWithToken.currentUser.profile();
+  return {
+    accessToken: sdk.getAccessToken(),
+    user: profile
+  };
 };
 
 export const fetchUserInfo = async () => {
@@ -84,5 +137,6 @@ export const getSpotifySDK = () => sdk;
 
 export const logout = () => {
   localStorage.removeItem('spotify_auth');
+  sessionStorage.removeItem('spotify_code_verifier');
   window.location.href = '/';
 };

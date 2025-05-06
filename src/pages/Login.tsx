@@ -3,8 +3,9 @@ import { Music } from 'lucide-react';
 import { getSpotifyAuthUrl } from '../services/spotifyAuth';
 
 const Login: React.FC = () => {
-  const handleLogin = () => {
-    window.location.href = getSpotifyAuthUrl();
+  const handleLogin = async () => {
+    const authUrl = await getSpotifyAuthUrl();
+    window.location.href = authUrl;
   };
 
   return (
